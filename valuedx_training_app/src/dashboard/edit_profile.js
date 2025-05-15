@@ -144,7 +144,7 @@ const ProfilePage = () => {
                 { label: "Email Password", name: "email_password" },
             ],
             admin: [
-                { label: "Email", name: "email", disabled: true },
+                { label: "Email", name: "email" },
                 { label: "Username", name: "username", disabled: true },
                 { label: "Password", name: "password" },
                 { label: "Email Password", name: "email_password" },

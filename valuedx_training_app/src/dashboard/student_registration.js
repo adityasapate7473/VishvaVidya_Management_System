@@ -6,7 +6,7 @@ import axios from "axios";
 import {
   Box, FormHelperText, Grid, Typography, TextField, Button, FormControlLabel, Radio, RadioGroup, CircularProgress, FormControl,
   InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, TableCell, Paper, Table, TableHead,
-  TableRow, Checkbox, TableBody, TableContainer, Divider, Container, List, ListItem, ListItemText
+  TableRow, Checkbox, TableBody, TableContainer, Divider, Container, List, ListItem, ListItemText, Autocomplete
 } from "@mui/material";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./studentRegistration.css";
@@ -14,75 +14,6 @@ import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import Tooltip from '@mui/material/Tooltip';
 import { Snackbar, Alert } from "@mui/material";
-
-const qualificationOptions = [
-  "Diploma",
-  "BE",
-  "ME",
-  "BCA",
-  "MCA",
-  "BCS",
-  "MCS",
-  "B.Tech",
-  "M.Tech",
-  "MBA",
-  "BSC",
-  "MSC",
-  "Other",
-];
-const passoutYearOptions = [
-  "2001",
-  "2002",
-  "2003",
-  "2004",
-  "2005",
-  "2006",
-  "2007",
-  "2008",
-  "2009",
-  "2010",
-  "2011",
-  "2012",
-  "2013",
-  "2014",
-  "2015",
-  "2016",
-  "2017",
-  "2018",
-  "2019",
-  "2020",
-  "2021",
-  "2022",
-  "2023",
-  "2024",
-  "2025",
-  "2026",
-  "2027",
-  "2028",
-  "2029",
-  "2030",
-  "Other",
-];
-const experienceOptions = [
-  "Below 6 Months",
-  "6 Months - 1 Year",
-  "1 Years",
-  "2 Years",
-  "3 Years",
-  "4 Years",
-  "5-7 years",
-  "7-10 years",
-  "10+ years",
-];
-
-// Added Training Status options
-const trainingStatusOptions = [
-  "Placed",
-  "Absconding",
-  "In Training",
-  "Completed",
-  "Shadowed",
-];
 
 const NAVBAR_HEIGHT = "64px"; // Adjust this based on your Navbar height
 
@@ -108,6 +39,7 @@ const StudentRegistration = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // success | error | warning | info
+  const [ignoredRows, setIgnoredRows] = useState([]);
 
   const [formData, setFormData] = useState({
     studentName: "",
@@ -147,6 +79,17 @@ const StudentRegistration = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Options for dropdowns
+  const qualificationOptions = [
+    "Diploma", "BE", "ME", "BCA", "MCA", "BCS", "MCS", "B.Tech", "M.Tech", "MBA", "BSC", "MSC"
+  ];
+  const experienceOptions = [
+    "Fresher", "Below 6 Months", "6 Months - 1 Year", "1 Year", "2 Years", "3 Years", "4 Years", "5-7 years", "7-10 years", "10+ years"
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const passoutYearOptions = Array.from({ length: 26 }, (_, i) => currentYear - 20 + i);
+  const trainingStatusOptions = ["Placed", "Absconding", "In Training", "Completed", "Shadowed", "pip", "On Leave", "Training Closed"];
 
   const validateForm = () => {
     const errors = [];
@@ -220,9 +163,16 @@ const StudentRegistration = () => {
       aptitudeMarks: formData.aptitudeMarks,
       aptitudePercentage: formData.aptitudePercentage,
       aptitudeResult: formData.aptitudeResult,
+      passoutYear: formData.passoutYear,
+      batchName: formData.batchName,
+      highestQualification: formData.highestQualification,
+      skillset: formData.skillset,
+      certification: formData.certification,
+      currentLocation: formData.currentLocation,
+      experience: formData.experience,
+      trainingStatus: formData.trainingStatus,
       role,
       userid,
-      // backend will handle default values for other fields
     };
 
     try {
@@ -242,6 +192,17 @@ const StudentRegistration = () => {
           studentName: "",
           email: "",
           contactNo: "",
+          aptitudeMarks: "",
+          aptitudePercentage: "",
+          aptitudeResult: "",
+          passoutYear: "",
+          batchName: "",
+          highestQualification: "",
+          skillset: "",
+          certification: "",
+          currentLocation: "",
+          experience: "",
+          trainingStatus: "",
         });
         setOtherQualification("");
         setActiveTab(1);
@@ -257,6 +218,7 @@ const StudentRegistration = () => {
       setDialogOpen(true);
     }
   };
+
 
   const handleUpload = async () => {
     if (!file) {
@@ -280,8 +242,8 @@ const StudentRegistration = () => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("role", userid);
-      formData.append("userid", role);
+      formData.append("role", role);
+      formData.append("userid", userid);
 
       const response = await fetch(`${config.API_BASE_URL}/api/studentRegistrationExcelUpload`, {
         method: "POST",
@@ -294,13 +256,10 @@ const StudentRegistration = () => {
         const result = await response.json();
 
         let message = `${result.inserted} students registered successfully.`;
-        if (result.ignored?.length) {
-          message += `\n\nIgnored rows:\n${result.ignored.join("\n")}`;
-        }
-
         setDialogTitle("Success");
         setDialogMessage(message);
-        setValidationErrors([]);
+        setValidationErrors(result.errorDetails || []);
+        setIgnoredRows(result.ignoredDetails || []);
         setDialogOpen(true);
 
         // Reload after 2 seconds
@@ -325,7 +284,7 @@ const StudentRegistration = () => {
           setDialogMessage(errorJson.message || "Unknown error occurred.");
           setValidationErrors([]);
         }
-        
+
         setDialogOpen(true);
       } else {
         const errorText = await response.text();
@@ -483,7 +442,7 @@ const StudentRegistration = () => {
             sx={{ minHeight: "40px" }}
           >
             <Tab
-              icon={<PersonAddAltIcon/>}
+              icon={<PersonAddAltIcon />}
               iconPosition="start"
               label="Register Student"
               value={0}
@@ -546,6 +505,11 @@ const StudentRegistration = () => {
 
                   <form onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
+                      {/* Required Fields */}
+                      <Grid item xs={12}>
+                        <Typography variant="h6">Required Fields</Typography>
+                      </Grid>
+
                       <Grid item xs={12} sm={4}>
                         <TextField
                           name="studentName"
@@ -578,7 +542,7 @@ const StudentRegistration = () => {
                           onChange={(e) => {
                             const value = e.target.value;
                             if (/^\d{0,10}$/.test(value)) {
-                              setFormData({ ...formData, contactNo: value });
+                              setFormData((prev) => ({ ...prev, contactNo: value }));
                             }
                           }}
                           fullWidth
@@ -587,31 +551,40 @@ const StudentRegistration = () => {
                         />
                       </Grid>
 
-                      <Grid item xs={12} sm={4}>
+                      {/* Optional Fields */}
+                      <Grid item xs={12}>
+                        <Typography variant="h6">Optional Fields</Typography>
+                      </Grid>
+
+                      {/* Aptitude Info */}
+                      <Grid item xs={12} sm={3}>
                         <TextField
                           name="aptitudeMarks"
                           label="Aptitude Marks"
                           value={formData.aptitudeMarks}
                           onChange={handleChange}
                           fullWidth
+                          placeholder="e.g. 45"
                         />
                       </Grid>
-                      <Grid item xs={12} sm={4}>
+
+                      <Grid item xs={12} sm={3}>
                         <TextField
                           name="aptitudePercentage"
                           label="Aptitude Percentage"
                           value={formData.aptitudePercentage}
                           onChange={handleChange}
                           fullWidth
+                          placeholder="e.g. 80%"
                         />
                       </Grid>
 
-                      <Grid item xs={12} sm={4}>
+                      <Grid item xs={12} sm={3}>
                         <TextField
                           select
                           name="aptitudeResult"
                           label="Aptitude Result"
-                          value={formData.aptitudeResult || ""}
+                          value={formData.aptitudeResult}
                           onChange={handleChange}
                           fullWidth
                         >
@@ -621,23 +594,143 @@ const StudentRegistration = () => {
                         </TextField>
                       </Grid>
 
+                      {/* Additional Info */}
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          select
+                          name="passoutYear"
+                          label="Passout Year"
+                          value={formData.passoutYear}
+                          onChange={handleChange}
+                          fullWidth
+                        >
+                          <MenuItem value="">-- Select Year --</MenuItem>
+                          {passoutYearOptions.map((year) => (
+                            <MenuItem key={year} value={year}>
+                              {year}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
 
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          name="batchName"
+                          label="Batch Name"
+                          value={formData.batchName}
+                          onChange={handleChange}
+                          fullWidth
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={3}>
+                        <Autocomplete
+                          freeSolo
+                          options={qualificationOptions}
+                          value={formData.highestQualification || ""}
+                          onChange={(e, newValue) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              highestQualification: newValue || "",
+                            }));
+                          }}
+                          onInputChange={(e, newInputValue) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              highestQualification: newInputValue,
+                            }));
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Highest Qualification"
+                              fullWidth
+                            />
+                          )}
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          name="skillset"
+                          label="Skillset"
+                          value={formData.skillset}
+                          onChange={handleChange}
+                          fullWidth
+                          placeholder="e.g. JavaScript, Python, SQL"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          name="certification"
+                          label="Certification"
+                          value={formData.certification}
+                          onChange={handleChange}
+                          fullWidth
+                          placeholder="e.g. AWS Certified, Python Bootcamp"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          name="currentLocation"
+                          label="Current Location"
+                          value={formData.currentLocation}
+                          onChange={handleChange}
+                          fullWidth
+                          placeholder="e.g. Pune, Bangalore"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          select
+                          name="experience"
+                          label="Experience"
+                          value={formData.experience}
+                          onChange={handleChange}
+                          fullWidth
+                        >
+                          <MenuItem value="">-- Select Experience --</MenuItem>
+                          {experienceOptions.map((exp) => (
+                            <MenuItem key={exp} value={exp}>
+                              {exp}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          select
+                          name="trainingStatus"
+                          label="Training Status"
+                          value={formData.trainingStatus}
+                          onChange={handleChange}
+                          fullWidth
+                        >
+                          <MenuItem value="">-- Select Status --</MenuItem>
+                          {trainingStatusOptions.map((status) => (
+                            <MenuItem key={status} value={status}>
+                              {status}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
                     </Grid>
 
                     <Box sx={{ mt: 4, display: "flex", gap: 2 }}>
                       <Button type="submit" variant="contained" color="primary">
                         Register
                       </Button>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        component={Link}
-                        to="/dashboard"
-                      >
+                      <Button variant="outlined" color="secondary" component={Link} to="/dashboard">
                         Home
                       </Button>
                     </Box>
                   </form>
+
+
                 </Box>
               )}
 
@@ -658,16 +751,37 @@ const StudentRegistration = () => {
                     variant="outlined"
                     color="success"
                     onClick={handleDownloadTemplate}
-                    sx={{ mb: 3 }}
+                    sx={{ mb: 2 }}
                   >
                     Download Excel Template
                   </Button>
-
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 1, fontStyle: "italic" }}
+                  >
+                    Please don’t change column names in the Excel template.
+                  </Typography>
+                  <Box
+                    sx={{
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      mb: 1,
+                    }}
+                  />
                   <Typography
                     variant="subtitle1"
-                    sx={{ mb: 2, fontWeight: 500 }}
+                    sx={{ mb: 1, fontWeight: 500 }}
                   >
                     Upload Excel File (.xlsx)
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="error"
+                    sx={{ mb: 1 }}
+                  >
+                    * Required fields: <b>student_name, email_id, contact_no</b>
                   </Typography>
 
                   <Box
@@ -706,8 +820,7 @@ const StudentRegistration = () => {
                     )}
                   </Box>
 
-
-                  <Box sx={{ mt: 4, display: "flex", gap: 2 }}>
+                  <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
                     <Button
                       onClick={handleUpload}
                       variant="contained"
@@ -940,23 +1053,51 @@ const StudentRegistration = () => {
         >
           {dialogTitle}
         </DialogTitle>
+
         <DialogContent dividers>
           <Typography variant="body1" gutterBottom sx={{ color: "#0096FF" }}>
             {dialogMessage}
           </Typography>
 
           {validationErrors.length > 0 && (
-            <List>
-              {validationErrors.map((error, idx) => (
-                <ListItem key={idx}>
-                  <ListItemText primary={error} />
-                </ListItem>
-              ))}
-            </List>
+            <>
+              <Typography
+                variant="subtitle2"
+                sx={{ mt: 2, fontWeight: "bold", color: "red" }}
+              >
+                Validation Errors:
+              </Typography>
+              <List dense>
+                {validationErrors.map((error, idx) => (
+                  <ListItem key={`error-${idx}`} disablePadding>
+                    <ListItemText primary={`• ${error}`} />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
+
+          {ignoredRows.length > 0 && (
+            <>
+              <Typography
+                variant="subtitle2"
+                sx={{ mt: 2, fontWeight: "bold", color: "orange" }}
+              >
+                Ignored Records:
+              </Typography>
+              <List dense>
+                {ignoredRows.map((msg, idx) => (
+                  <ListItem key={`ignored-${idx}`} disablePadding>
+                    <ListItemText primary={`• ${msg}`} />
+                  </ListItem>
+                ))}
+              </List>
+            </>
           )}
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="secondary" autoFocus>
+          <Button onClick={handleCloseDialog} color="secondary">
             Cancel
           </Button>
           <Button onClick={handleCloseDialog} variant="contained" color="primary">
